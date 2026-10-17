@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgroGestor Nicaragua - PWA</title>
+    <!-- Font Awesome para Iconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- sql.js (WebAssembly SQLite) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/sidebar.css">
+    <link rel="manifest" href="manifest.json">
+</head>
+<body>
+    <!-- Navbar / Header -->
+    <header class="app-header">
+        <div class="header-left">
+            <button class="back-btn" id="btn-back" onclick="app.goBack()" style="display:none;" title="Regresar">
+                <i class="fa-solid fa-arrow-left"></i>
+            </button>
+            <div class="logo" onclick="app.navigate('dashboard')" style="cursor: pointer;" title="Volver al Inicio">
+                <i class="fa-solid fa-leaf"></i>
+                <span>AgroGestor Ni</span>
+            </div>
+        </div>
+        <div class="user-actions">
+            <button class="hamburger-btn" onclick="app.toggleSidebar()" title="Menú">
+                <i class="fa-solid fa-bars"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Sidebar Overlay & Content -->
+    <div class="sidebar-overlay" id="sidebar-overlay" onclick="app.toggleSidebar()"></div>
+    <div class="sidebar" id="sidebar">
+        <h3 style="color:white; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom:10px;">Menú</h3>
+        <button id="btn-theme-toggle" class="btn-ghost" onclick="app.toggleTheme()"><i class="fa-solid fa-moon"></i> Modo Oscuro</button>
+        <button id="btn-admin-extras" class="btn-ghost" onclick="admin.solicitarAcceso(); app.toggleSidebar();" style="display:none;"><i class="fa-solid fa-screwdriver-wrench"></i> Funciones Extras</button>
+        <button id="btn-login" class="btn-ghost">Ingresar</button>
+    </div>
+
+    <!-- Main Content -->
+    <main class="app-content">
+        <!-- Vista: Dashboard -->
+        <section id="view-dashboard" class="view active">
+            <div class="weather-widget">
+                <div class="weather-info">
+                    <h2>Nicaragua - Zonas Agrícolas</h2>
+                    <p>Condiciones óptimas para fertilización edáfica.</p>
+                </div>
+                <div class="weather-icon"><i class="fa-solid fa-cloud-sun"></i></div>
+            </div>
+
+            <div class="quick-actions">
+                <button class="action-card" onclick="app.navigate('catalogo')">
+                    <i class="fa-solid fa-book-open"></i>
+                    <span>Catálogo de Insumos</span>
+                </button>
+                <button class="action-card" onclick="app.navigate('calculadora-abono')">
+                    <i class="fa-solid fa-scale-balanced"></i>
+                    <span>Calculadora Abono</span>
+                </button>
+                <button class="action-card" onclick="app.navigate('calculadora-liquido')">
+                    <i class="fa-solid fa-droplet"></i>
+                    <span>Calculadora Líquidos</span>
+                </button>
+                <button class="action-card" onclick="app.navigate('calculadora-costos')">
+                    <i class="fa-solid fa-money-bill-wave"></i>
+                    <span>Calculadora Costos</span>
+                </button>
+                <button class="action-card" onclick="app.navigate('calculadora-riego')">
+                    <i class="fa-solid fa-faucet-drip"></i>
+                    <span>Calculadora Riego</span>
+                </button>
+            </div>
+            
+            <div class="recent-activity" id="recent-activity-container" style="display:none;">
+                <h3>Tu Historial de Cálculos</h3>
+                <ul id="historial-list"></ul>
+            </div>
+        </section>
+
+        <!-- Vista: Panel de Admin -->
+        <section id="view-admin" class="view">
+            <h2>Panel de Administrador</h2>
+            
+            <div class="admin-tabs" style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+                <button class="btn-primary" id="tab-add" onclick="admin.showTab('add')">Añadir Producto</button>
+                <button class="btn-ghost" id="tab-manage" onclick="admin.showTab('manage')">Gestionar Productos</button>
+                <button class="btn-ghost" id="tab-palette" onclick="admin.showTab('palette')"><i class="fa-solid fa-palette"></i> Paleta de Colores</button>
+            </div>
+
+            <!-- Tab: Añadir/Editar Producto -->
+            <div id="admin-add-section">
+                <p class="description" id="admin-form-title">Añadir nuevo producto al catálogo global.</p>
+                <div class="calc-form">
+                    <input type="hidden" id="admin-id">
+                    <div class="form-group">
+                        <label>Tipo de Insumo</label>
+                        <select id="admin-tipo">
+                            <option value="ABONO">Abono (Sólido)</option>
+                            <option value="LIQUIDO">Líquido (Fitosanitario)</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>Nombre Comercial</label><input type="text" id="admin-nombre" placeholder="Ej. Urea 46%"></div>
+                    <div class="form-group"><label>Distribuidor</label><input type="text" id="admin-distribuidor" placeholder="Ej. SAGSA"></div>
+                    <div class="form-group"><label>Composición / Ingrediente</label><input type="text" id="admin-composicion"></div>
+                    <div class="form-group"><label>Propósito</label><input type="text" id="admin-proposito"></div>
+                    <div class="form-group"><label>Modo de Aplicación</label><input type="text" id="admin-aplicacion"></div>
+                    <div class="form-group"><label>Nota de Compatibilidad</label><input type="text" id="admin-compatibilidad"></div>
+                    <div class="form-group">
+                        <label>Regla de Restricción</label>
+                        <select id="admin-regla">
+                            <option value="SOLO_ABONOS">Solo mezclar con Abonos</option>
+                            <option value="SOLO_LIQUIDOS">Solo mezclar con Líquidos</option>
+                            <option value="NINGUNA">Altamente Reactivo (No mezclar)</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>Presentación</label><input type="text" id="admin-presentacion" placeholder="Ej. Saco de 100 lb"></div>
+                    <div class="form-group"><label>Precio Regular (C$) (Opcional)</label><input type="number" id="admin-precio" step="0.01" placeholder="Ej. 120.50"></div>
+
+                    <!-- Ofertas y Promociones -->
+                    <div style="background: #fff8e1; border: 1px solid #ffe082; border-radius: 10px; padding: 15px; margin-bottom: 15px;">
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                            <input type="checkbox" id="admin-en-oferta" onchange="admin.toggleOfertaFields()" style="width: 20px; height: 20px; cursor: pointer;">
+                            <label for="admin-en-oferta" style="margin: 0; cursor: pointer; font-weight: 700; color: #b7791f;">
+                                <i class="fa-solid fa-tag"></i> Activar Oferta / Promoción
+                            </label>
+                        </div>
+                        <div id="admin-oferta-fields" style="display: none; margin-top: 10px;">
+                            <div class="form-group">
+                                <label>Precio de Oferta / Rebaja (C$)</label>
+                                <input type="number" id="admin-precio-oferta" step="0.01" placeholder="Ej. 95.00 (Precio promocional)">
+                            </div>
+                            <div class="form-group">
+                                <label>Texto o Etiqueta de la Promoción</label>
+                                <input type="text" id="admin-texto-promo" placeholder="Ej. ¡20% Descuento!, Oferta de Cosecha, 2x1">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Estado de Stock / Agotado -->
+                    <div style="background: #ffebee; border: 1px solid #ffcdd2; border-radius: 10px; padding: 15px; margin-bottom: 15px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <input type="checkbox" id="admin-agotado" style="width: 20px; height: 20px; cursor: pointer;">
+                            <label for="admin-agotado" style="margin: 0; cursor: pointer; font-weight: 700; color: #c62828;">
+                                <i class="fa-solid fa-ban"></i> Marcar Producto como AGOTADO (Sin Existencias)
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Imagen del Producto</label>
+                        <input type="file" id="admin-imagen" accept="image/*">
+                    </div>
+                    <button class="btn-primary" id="btn-save-product" onclick="admin.guardarProducto()">Guardar Producto</button>
+                    <button class="btn-ghost" id="btn-cancel-edit" style="display:none;" onclick="admin.cancelEdit()">Cancelar</button>
+                </div>
+            </div>
+
+            <!-- Tab: Gestionar Productos -->
+            <div id="admin-manage-section" style="display:none;">
+                <p class="description">Modificar, cambiar stock o eliminar productos existentes.</p>
+                <div class="search-bar" style="margin-bottom: 15px;">
+                    <input type="text" id="admin-search-manage" placeholder="Buscar por nombre..." onkeyup="admin.renderManageList()">
+                </div>
+                <div id="admin-products-list" class="grid-list" style="display: flex; flex-direction: column; gap: 10px;"></div>
+            </div>
+
+            <!-- Tab: Paleta de Colores de la Web -->
+            <div id="admin-palette-section" style="display:none;">
+                <p class="description">Personalice la paleta de colores oficial de la plataforma. La paleta que guarde se aplicará automáticamente a todos los usuarios.</p>
+                
+                <div class="palette-picker-grid">
+                    <div class="palette-card active" id="card-pal-verde" onclick="admin.seleccionarPaleta('verde')">
+                        <div class="palette-swatches">
+                            <div class="palette-swatch" style="background:#2D6A4F;"></div>
+                            <div class="palette-swatch" style="background:#52B788;"></div>
+                        </div>
+                        <strong>Verde Esmeralda</strong>
+                        <small style="color:var(--text-muted); display:block; font-size:0.75rem;">Campo clásico</small>
+                    </div>
+
+                    <div class="palette-card" id="card-pal-tierra" onclick="admin.seleccionarPaleta('tierra')">
+                        <div class="palette-swatches">
+                            <div class="palette-swatch" style="background:#7f4f24;"></div>
+                            <div class="palette-swatch" style="background:#b08968;"></div>
+                        </div>
+                        <strong>Tierra & Cosecha</strong>
+                        <small style="color:var(--text-muted); display:block; font-size:0.75rem;">Suelo fértil</small>
+                    </div>
+
+                    <div class="palette-card" id="card-pal-azul" onclick="admin.seleccionarPaleta('azul')">
+                        <div class="palette-swatches">
+                            <div class="palette-swatch" style="background:#1d3557;"></div>
+                            <div class="palette-swatch" style="background:#457b9d;"></div>
+                        </div>
+                        <strong>Azul Riego</strong>
+                        <small style="color:var(--text-muted); display:block; font-size:0.75rem;">Agua y tecnología</small>
+                    </div>
+
+                    <div class="palette-card" id="card-pal-dorado" onclick="admin.seleccionarPaleta('dorado')">
+                        <div class="palette-swatches">
+                            <div class="palette-swatch" style="background:#b7791f;"></div>
+                            <div class="palette-swatch" style="background:#ecc94b;"></div>
+                        </div>
+                        <strong>Dorado Maíz</strong>
+                        <small style="color:var(--text-muted); display:block; font-size:0.75rem;">Granos y sol</small>
+                    </div>
+
+                    <div class="palette-card" id="card-pal-bosque" onclick="admin.seleccionarPaleta('bosque')">
+                        <div class="palette-swatches">
+                            <div class="palette-swatch" style="background:#386641;"></div>
+                            <div class="palette-swatch" style="background:#a7c957;"></div>
+                        </div>
+                        <strong>Verde Oliva</strong>
+                        <small style="color:var(--text-muted); display:block; font-size:0.75rem;">Agroecológico</small>
+                    </div>
+
+                    <div class="palette-card" id="card-pal-vino" onclick="admin.seleccionarPaleta('vino')">
+                        <div class="palette-swatches">
+                            <div class="palette-swatch" style="background:#6b2d5c;"></div>
+                            <div class="palette-swatch" style="background:#b06ab3;"></div>
+                        </div>
+                        <strong>Tinto Agrícola</strong>
+                        <small style="color:var(--text-muted); display:block; font-size:0.75rem;">Frutales y uva</small>
+                    </div>
+                </div>
+
+                <div style="background:#f8f9fa; border-radius:12px; padding:15px; margin:20px 0; border:1px solid #ddd;">
+                    <h4 style="margin-bottom:8px; color:var(--primary-dark);"><i class="fa-solid fa-circle-check"></i> Vista Previa Activa</h4>
+                    <p style="font-size:0.9rem; color:var(--text-muted); margin-bottom:15px;">
+                        Al hacer clic en cualquier paleta arriba, los colores de la interfaz cambian de inmediato para que compruebes cómo luce. Haz clic en el botón de abajo para fijarla permanentemente.
+                    </p>
+                    <button class="btn-primary" onclick="admin.guardarPaleta()"><i class="fa-solid fa-floppy-disk"></i> Guardar y Aplicar Paleta para Todos los Usuarios</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Vista: Catálogo -->
+        <section id="view-catalogo" class="view">
+            <h2>Catálogo de Agroinsumos (IPSA)</h2>
+            <div class="search-bar">
+                <input type="text" id="search-catalogo" placeholder="Buscar por nombre, activo o distribuidor...">
+                <select id="filter-type">
+                    <option value="ALL">Todos los Insumos</option>
+                    <option value="ABONO">Abonos (Sólidos)</option>
+                    <option value="LIQUIDO">Líquidos (Fitosanitarios)</option>
+                    <option value="OFERTAS">🏷️ Ofertas y Promociones</option>
+                    <option value="DISPONIBLES">✅ Solo Disponibles (En Stock)</option>
+                    <option value="AGOTADOS">❌ Agotados (Sin Stock)</option>
+                </select>
+            </div>
+            <div id="catalogo-list" class="grid-list"></div>
+        </section>
+
+
+
+        <!-- Vista: Calculadora Abono -->
+        <section id="view-calculadora-abono" class="view">
+            <h2>Calculadora de Abono (Sólidos)</h2>
+            <div class="calc-form">
+                <div class="form-group">
+                    <label>Distancia entre matas (m)</label>
+                    <input type="number" id="calc-abono-matas" step="0.01" placeholder="Ej. 1.5">
+                </div>
+                <div class="form-group">
+                    <label>Distancia entre filas (m)</label>
+                    <input type="number" id="calc-abono-filas" step="0.01" placeholder="Ej. 2.0">
+                </div>
+                <div class="form-group">
+                    <label>Dosis requerida por planta (gramos) - Opcional</label>
+                    <input type="number" id="calc-abono-dosis" step="1" placeholder="Ej. 50">
+                </div>
+                <div class="form-group">
+                    <label>Fertilizante Seleccionado</label>
+                    <select id="calc-abono-prod"><option value="">Cargando...</option></select>
+                </div>
+                <button class="btn-primary" onclick="calculadores.calcularAbono()">Calcular Dosis</button>
+            </div>
+            <div id="calc-abono-resultado" class="result-card"></div>
+        </section>
+
+        <!-- Vista: Calculadora Líquido -->
+        <section id="view-calculadora-liquido" class="view">
+            <h2>Calculadora de Líquidos</h2>
+            <div class="calc-form">
+                <div class="form-group">
+                    <label>Producto Líquido</label>
+                    <select id="calc-liq-prod"><option value="">Cargando...</option></select>
+                </div>
+                <div class="form-group">
+                    <label>Tipo de Aplicación</label>
+                    <select id="calc-liq-tipo" onchange="calculadores.toggleLiqFields()">
+                        <option value="porcentaje">Porcentaje de Mezcla (%)</option>
+                        <option value="proporcion">Proporción Directa (ml/L)</option>
+                        <option value="calibracion">Superficie (Calibración L/mz)</option>
+                    </select>
+                </div>
+                
+                <div id="calc-liq-fields">
+                    <!-- Dynamic fields will be inserted here by JS -->
+                </div>
+                
+                <button class="btn-primary" onclick="calculadores.calcularLiquido()">Calcular Preparación</button>
+            </div>
+            <div id="calc-liq-resultado" class="result-card"></div>
+        </section>
+
+        <!-- Vista: Calculadora de Costos -->
+        <section id="view-calculadora-costos" class="view">
+            <h2>Calculadora de Costos</h2>
+            <p class="description">Calcule el total a pagar según la cantidad de producto que necesite.</p>
+            <div class="calc-form">
+                <div class="form-group">
+                    <label>Seleccionar Producto</label>
+                    <select id="calc-costo-prod" onchange="calculadores.autoFillCostoPrice()">
+                        <option value="">Seleccione un producto...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Precio Unitario (C$)</label>
+                    <input type="number" id="calc-costo-precio" step="0.01" placeholder="Ej. 120.50">
+                    <small style="color:var(--text-muted);">Puede ser editado libremente.</small>
+                </div>
+                <div class="form-group">
+                    <label>Cantidad (Ej. 2, 5, 10)</label>
+                    <input type="number" id="calc-costo-cantidad" step="1" placeholder="Ej. 2">
+                </div>
+                <button class="btn-primary" onclick="calculadores.agregarItemCosto()"><i class="fa-solid fa-plus"></i> Agregar a la lista</button>
+            </div>
+            
+            <div class="result-card" style="display:block; margin-top:20px;">
+                <h3 style="margin-bottom:15px;">Lista de Productos</h3>
+                <div style="overflow-x:auto;">
+                    <table style="width:100%; border-collapse: collapse; text-align: left; min-width: 400px;">
+                        <thead>
+                            <tr style="border-bottom: 2px solid #ddd; background: #f8f9fa;">
+                                <th style="padding: 10px;">Producto</th>
+                                <th style="padding: 10px;">Precio (C$)</th>
+                                <th style="padding: 10px;">Cant.</th>
+                                <th style="padding: 10px;">Subtotal (C$)</th>
+                                <th style="padding: 10px; text-align:center;">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="calc-costo-items-table">
+                            <!-- Items go here -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <hr style="margin:15px 0; border:none; border-top:1px solid #ccc;">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                    <button class="btn-ghost" onclick="calculadores.limpiarCostos()"><i class="fa-solid fa-trash-can"></i> Vaciar Lista</button>
+                    <h2 style="color:var(--primary-dark); font-size:1.8rem; margin:0;">Total a Pagar: C$ <span id="calc-costo-total-global">0.00</span></h2>
+                </div>
+            </div>
+        </section>
+
+        <!-- Vista: Calculadora de Riego por Goteo -->
+        <section id="view-calculadora-riego" class="view">
+            <h2>Calculadora de Sistema de Riego por Goteo</h2>
+            <p class="description">Calcule los materiales necesarios (tuberías PVC, cinta de goteo, conectores y válvulas) y el presupuesto total para su terreno.</p>
+            <div class="calc-form">
+                <div class="form-group">
+                    <label>Distancia entre Surcos (metros) <span style="color:var(--danger);">*</span></label>
+                    <input type="number" id="calc-riego-distancia" step="0.05" value="1.0" min="0.1" placeholder="Ej. 1.0 (1 metro)">
+                    <small style="color:var(--text-muted);">Distancia de separación entre cada surco o hilera de siembra.</small>
+                </div>
+                <div class="form-group">
+                    <label>Dimensiones del Terreno en Manzanas (mz) <span style="color:var(--danger);">*</span></label>
+                    <input type="number" id="calc-riego-tamano" step="0.1" value="1.0" min="0.01" placeholder="Ej. 1.0 (1 Manzana)">
+                    <small style="color:var(--text-muted);">
+                        1 Manzana (Nicaragua) = 10,000 varas² ≈ 7,026 m² (~84 m de ancho × 84 m de largo).
+                    </small>
+                </div>
+
+                <!-- Medidas Opcionales del Terreno -->
+                <details style="margin-bottom:15px; border:1px solid #ced4da; border-radius:10px; padding:12px; background:#fff;">
+                    <summary style="font-weight:600; cursor:pointer; color:var(--primary-dark);">
+                        <i class="fa-solid fa-ruler-combined"></i> Medidas exactas del terreno en metros (Opcional)
+                    </summary>
+                    <div style="margin-top:12px;">
+                        <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:12px;">
+                            Si conoces las dimensiones en metros de tu lote, ingrésalas aquí. Si se dejan vacías, se calculará automáticamente según la cantidad de manzanas indicada.
+                        </p>
+                        <div class="form-group">
+                            <label>Ancho del Terreno / Cabecera PVC (metros)</label>
+                            <input type="number" id="calc-riego-ancho" step="1" placeholder="Ej. 84 m para 1 mz (Recorrido de tubería principal)">
+                        </div>
+                        <div class="form-group">
+                            <label>Largo del Terreno / Longitud de Surco (metros)</label>
+                            <input type="number" id="calc-riego-largo" step="1" placeholder="Ej. 84 m para 1 mz (Tirada de cada cinta)">
+                        </div>
+                    </div>
+                </details>
+
+                <!-- Precios de Materiales -->
+                <details style="margin-bottom:15px; border:1px solid #ced4da; border-radius:10px; padding:12px; background:#fff;">
+                    <summary style="font-weight:600; cursor:pointer; color:var(--primary-dark);">
+                        <i class="fa-solid fa-tags"></i> Precios de Materiales y Constantes (C$)
+                    </summary>
+                    <div style="margin-top:12px;">
+                        <div class="form-group">
+                            <label>Tubo PVC de 2" (6 metros) (C$)</label>
+                            <input type="number" id="calc-riego-p-tubo" step="1" value="200">
+                        </div>
+                        <div class="form-group">
+                            <label>Rollo de Cinta de Goteo (2,600 metros) (C$)</label>
+                            <input type="number" id="calc-riego-p-cinta" step="1" value="6550">
+                        </div>
+                        <div class="form-group">
+                            <label>Conector Inicial PVC × Polietileno (C$ c/u)</label>
+                            <input type="number" id="calc-riego-p-cinicial" step="1" value="12">
+                        </div>
+                        <div class="form-group">
+                            <label>Conector Válvula Polietileno × Cinta (C$ c/u)</label>
+                            <input type="number" id="calc-riego-p-cvalvula" step="1" value="40">
+                        </div>
+                    </div>
+                </details>
+
+                <button class="btn-primary" onclick="calculadores.calcularRiego()"><i class="fa-solid fa-calculator"></i> Calcular Presupuesto de Riego</button>
+            </div>
+            <div id="calc-riego-resultado" class="result-card"></div>
+        </section>
+
+    </main>
+
+    <!-- Custom Alert Modal -->
+    <div class="modal" id="custom-alert-modal" style="z-index: 9999;">
+        <div class="modal-content" style="text-align: center; max-width: 350px;">
+            <div id="custom-alert-icon" style="font-size: 3rem; margin-bottom: 15px;"></div>
+            <h3 id="custom-alert-title" style="margin-bottom: 10px;"></h3>
+            <p id="custom-alert-message" style="margin-bottom: 20px; color: var(--text-muted);"></p>
+            <button class="btn-primary" onclick="app.closeAlert()">Aceptar</button>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation (Mobile) -->
+    <nav class="bottom-nav">
+        <button class="nav-item active" onclick="app.navigate('dashboard')"><i class="fa-solid fa-house"></i>Inicio</button>
+        <button class="nav-item" onclick="app.navigate('catalogo')"><i class="fa-solid fa-book"></i>Catálogo</button>
+        <button class="nav-item" onclick="app.navigate('calculadora-abono')"><i class="fa-solid fa-calculator"></i>Cálculos</button>
+    </nav>
+
+    <!-- Modal Login/Registro -->
+    <div id="auth-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="app.closeModal()">&times;</span>
+            <h2 id="auth-title">Iniciar Sesión</h2>
+            <div class="form-group">
+                <label>Usuario / Email</label>
+                <input type="text" id="auth-user" placeholder="tucorreo@ejemplo.com">
+            </div>
+            <div class="form-group">
+                <label>Contraseña</label>
+                <div style="position: relative;">
+                    <input type="password" id="auth-pass" placeholder="••••••••">
+                    <i class="fa-solid fa-eye" id="toggle-pass-visibility" onclick="app.togglePasswordVisibility()" style="position: absolute; right: 15px; top: 15px; cursor: pointer; color: var(--text-muted);"></i>
+                </div>
+            </div>
+            <button class="btn-primary" id="btn-auth-action" onclick="app.authenticate()">Entrar</button>
+            <p class="switch-auth" onclick="app.toggleAuthMode()">¿No tienes cuenta? Regístrate aquí.</p>
+            <p class="switch-auth" style="margin-top: 10px; color: var(--text-muted); font-weight: normal; font-size: 0.85rem;" onclick="app.openRecoveryModal()">¿Olvidaste tu contraseña?</p>
+        </div>
+    </div>
+
+    <!-- Recovery Modal -->
+    <div class="modal" id="recovery-modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="app.closeRecoveryModal()">&times;</span>
+            <h2 id="recovery-title" style="margin-bottom: 20px; color: var(--primary-dark);">Recuperar Contraseña</h2>
+            
+            <div id="recovery-step-1">
+                <p style="margin-bottom: 15px; font-size: 0.9rem; color: var(--text-muted);">Ingresa tu correo electrónico para recibir un código de recuperación.</p>
+                <div class="form-group">
+                    <label>Correo Electrónico</label>
+                    <input type="email" id="recovery-email" placeholder="usuario@correo.com">
+                </div>
+                <button class="btn-primary" onclick="app.sendRecoveryCode()">Enviar Código</button>
+            </div>
+
+            <div id="recovery-step-2" style="display:none;">
+                <p style="margin-bottom: 15px; font-size: 0.9rem; color: var(--text-muted);">Ingresa el código que te enviamos y tu nueva contraseña.</p>
+                <div class="form-group">
+                    <label>Código de Recuperación</label>
+                    <input type="text" id="recovery-code" placeholder="Ej. 123456">
+                </div>
+                <div class="form-group">
+                    <label>Nueva Contraseña</label>
+                    <input type="password" id="recovery-new-pass" placeholder="******">
+                </div>
+                <button class="btn-primary" onclick="app.verifyAndChangePassword()">Cambiar Contraseña</button>
+            </div>
+            <p class="switch-auth" style="margin-top: 15px;" onclick="app.closeRecoveryModal(); app.openModal();">Volver a Iniciar Sesión</p>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/database.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/admin.js"></script>
+    <script src="js/catalogo.js"></script>
+    <script src="js/calculadores.js"></script>
+</body>
+</html>
